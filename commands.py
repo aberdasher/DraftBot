@@ -14,7 +14,7 @@ league_start_time = pacific_time_zone.localize(datetime(2024, 5, 20, 0, 0))
 
 async def league_commands(bot):
 
-    # @bot.slash_command(name="teamfinder", description="Create team finder posts for different regions")
+    # @bot.tree.command(name="teamfinder", description="Create team finder posts for different regions")
     # async def teamfinder(ctx: discord.ApplicationContext):
     #     await ctx.defer()
     #     from teamfinder import TIMEZONES_AMERICAS, TIMEZONES_EUROPE, TIMEZONES_ASIA_AUSTRALIA, create_view
@@ -52,7 +52,7 @@ async def league_commands(bot):
     #             await session.commit()
     #     await ctx.followup.send("Click your timezone below to add your name to that timezone. You can click any name to open a DM with that user to coordiante finding teammates. Clicking the timezone again (once signed up) will remove your name from the list.", ephemeral=True)
 
-    @bot.slash_command(name="registerteam", description="Register a new team in the league")
+    @bot.tree.command(name="registerteam", description="Register a new team in the league")
     async def register_team(interaction: discord.Interaction, team_name: str):
         cube_overseer_role_name = "Cube Overseer"
         if cube_overseer_role_name not in [role.name for role in interaction.user.roles]:
@@ -62,13 +62,13 @@ async def league_commands(bot):
         team, response_message = await register_team_to_db(team_name)
         await interaction.response.send_message(response_message, ephemeral=True)
     
-    @bot.slash_command(name="delete_team", description="Mod Only: Remove a new team from the league")
+    @bot.tree.command(name="delete_team", description="Mod Only: Remove a new team from the league")
     async def deleteteam(ctx, *, team_name: str):
         await ctx.defer()  # Acknowledge the interaction immediately to prevent timeout
         response_message = await remove_team_from_db(ctx, team_name)
         await ctx.followup.send(response_message)
 
-    @bot.slash_command(name='list_teams', description='List all registered teams')
+    @bot.tree.command(name='list_teams', description='List all registered teams')
     async def list_teams(interaction: discord.Interaction):
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -91,17 +91,18 @@ async def league_commands(bot):
 
             await interaction.response.send_message(embed=embed)
 
-    @bot.slash_command(name='winston_draft', description='Lists all available slash commands')
+    @bot.tree.command(name='winston_draft', description='Lists all available slash commands')
     async def winstondraft(interaction: discord.Interaction):
         from utils import create_winston_draft
         await create_winston_draft(bot, interaction)
         await interaction.response.send_message("Queue posted in #winston-draft. Good luck!", ephemeral=True)
-    @bot.slash_command(name='commands', description='Lists all available slash commands')
-    async def list_commands(ctx):
+
+    @bot.tree.command(name='commands', description='Lists all available slash commands')
+    async def list_commands(interaction: discord.Interaction):
         # Manually creating a list of commands and descriptions
         commands_list = {
             "`/commands`": "Lists all available slash commands.\n",
-            "**Lobby Commands**" : "",
+            "**Lobby Commands**": "",
             "**`/startdraft`**": "Launch a lobby for randomized team drafts.",
             "**`/leaguedraft`**": "Launch a lobby for League Drafts (results tracked)",
             "**`/premadedraft`**": "Launch a lobby for premade teams (untracked)\n",
@@ -126,16 +127,18 @@ async def league_commands(bot):
         # Creating an embed to nicely format the list of commands
         embed = discord.Embed(title="Available Commands", description=commands_description, color=discord.Color.blue())
         
-        await ctx.respond(embed=embed)
+        # Send the embed as a response to the interaction
+        await interaction.response.send_message(embed=embed)
 
-    @bot.slash_command(name="swiss_scheduled_draft", description="Schedule a forthcoming draft")
+
+    @bot.tree.command(name="swiss_scheduled_draft", description="Schedule a forthcoming draft")
     async def scheduledraft(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         from league import InitialPostView
         initial_view = InitialPostView(command_type="swiss")
         await interaction.followup.send(f"Post a scheduled draft. Select Cube and Timezone.", view=initial_view, ephemeral=True)
 
-    # @bot.slash_command(name="post_challenge", description="Post a challenge for your team")
+    # @bot.tree.command(name="post_challenge", description="Post a challenge for your team")
     # async def postchallenge(interaction: discord.Interaction):
     #     global cutoff_datetime
 
@@ -171,7 +174,7 @@ async def league_commands(bot):
     #         await interaction.followup.send(f"An error occurred while processing your request: {str(e)}", ephemeral=True)
     #         print(f"Error in postchallenge command: {e}")  
 
-    @bot.slash_command(name="schedule_test_draft", description="Post a scheduled draft")
+    @bot.tree.command(name="schedule_test_draft", description="Post a scheduled draft")
     async def scheduledraft(interaction: discord.Interaction):
         guild = interaction.guild_id
         if guild != 336345350535118849:
@@ -181,19 +184,14 @@ async def league_commands(bot):
         else:
             await interaction.response.send_message("This command is only usable on the test server.")
 
-    @bot.slash_command(name="schedule_draft", description="Post a scheduled draft")
+    @bot.tree.command(name="schedule_draft", description="Post a scheduled draft")
     async def schedule_draft(interaction: discord.Interaction):
         from modals import CubeSelectionModal
         await interaction.response.send_modal(CubeSelectionModal(session_type="schedule", title="Select Cube"))
         
-    @bot.slash_command(
+    @bot.tree.command(
     name="remove_user_from_team",
     description="Remove a user from all teams they are assigned to"
-    )
-    @discord.option(
-        "user_id",
-        description="The Discord user ID of the member to remove from teams",
-        required=True
     )
     async def remove_user_from_team(interaction: discord.Interaction, user_id: str):
         # Check if the user has the "Cube Overseer" role
@@ -204,7 +202,7 @@ async def league_commands(bot):
 
         async with AsyncSessionLocal() as session:
             async with session.begin():
-                # Convert user_id to str if not already to ensure consistency in comparison
+                # Convert user_id to str to ensure consistency in comparison
                 user_id_str = str(user_id)
                 # Query for any team registration entries that include the user ID in their TeamMembers
                 stmt = select(TeamRegistration)
@@ -227,8 +225,7 @@ async def league_commands(bot):
         else:
             await interaction.response.send_message(f"User {user_id} was not found in any teams.", ephemeral=True)
 
-
-    @bot.slash_command(name="register_player", description="Post a challenge for your team")
+    @bot.tree.command(name="register_player", description="Post a challenge for your team")
     async def registerplayer(interaction: discord.Interaction):
         cube_overseer_role = discord.utils.get(interaction.guild.roles, name="Cube Overseer")
     
@@ -242,7 +239,7 @@ async def league_commands(bot):
 
     
             
-    # @bot.slash_command(name="find_a_match", description="Find an open challenge based on a given time.")
+    # @bot.tree.command(name="find_a_match", description="Find an open challenge based on a given time.")
     # async def findamatch(interaction: discord.Interaction):
     #     global cutoff_datetime
 
@@ -255,7 +252,7 @@ async def league_commands(bot):
     #     initial_view = InitialPostView(command_type="find")
     #     await interaction.response.send_message("Please select the range for your team", view=initial_view, ephemeral=True)
 
-    # @bot.slash_command(name="list_scheduled_drafts", description="List all open scheduled drafts in chronological order.")
+    # @bot.tree.command(name="list_scheduled_drafts", description="List all open scheduled drafts in chronological order.")
     # async def listscheduledswiss(interaction: discord.Interaction):
     #     now = datetime.now()
     #     async with AsyncSessionLocal() as db_session: 
@@ -281,7 +278,7 @@ async def league_commands(bot):
     #                 embed.add_field(name=f"Draft Scheduled: {formatted_time} ({relative_time})", value=f"Cube: {draft.cube}\nCurrent Signups: {num_sign_ups} \n[Sign Up Here!]({message_link})", inline=False)
     #             await interaction.response.send_message(embed=embed)
 
-    # @bot.slash_command(name="list_challenges", description="List all open challenges in chronological order.")
+    # @bot.tree.command(name="list_challenges", description="List all open challenges in chronological order.")
     # async def list_challenge(interaction: discord.Interaction):
     #     global cutoff_datetime
 
@@ -343,7 +340,7 @@ async def league_commands(bot):
 
 
 
-    @bot.slash_command(name='standings', description='Display the team standings by points earned')
+    @bot.tree.command(name='standings', description='Display the team standings by points earned')
     async def standings(interaction: discord.Interaction):
         global cutoff_datetime
 
@@ -355,7 +352,7 @@ async def league_commands(bot):
         
         await post_standings(interaction)
 
-    @bot.slash_command(name="trophies", description="Display the Trophy Leaderboard for the current month.")
+    @bot.tree.command(name="trophies", description="Display the Trophy Leaderboard for the current month.")
     async def trophies(ctx):
         eastern_tz = pytz.timezone('US/Eastern')
         now = datetime.now(eastern_tz)
@@ -413,7 +410,7 @@ async def league_commands(bot):
 
                 await ctx.respond(embed=embed)
 
-    @bot.slash_command(name="leaguedraft", description="Start a league draft with chosen teams and cube.")
+    @bot.tree.command(name="leaguedraft", description="Start a league draft with chosen teams and cube.")
     async def leaguedraft(interaction: discord.Interaction):
         global cutoff_datetime
 
@@ -695,7 +692,7 @@ async def swiss_draft_commands(bot):
 
                     await channel.send(embed=embed)
 
-    @bot.slash_command(name="swiss_draft", description="Post an eight player swiss pod")
+    @bot.tree.command(name="swiss_draft", description="Post an eight player swiss pod")
     async def swiss(interaction: discord.Interaction):
         global league_start_time
 
@@ -708,7 +705,7 @@ async def swiss_draft_commands(bot):
         from modals import CubeSelectionModal
         await interaction.response.send_modal(CubeSelectionModal(session_type="swiss", title="Select Cube"))
 
-    @bot.slash_command(name='player_standings', description='Display the AlphaFrog standings')
+    @bot.tree.command(name='player_standings', description='Display the AlphaFrog standings')
     async def player_standings(interaction: discord.Interaction):
         global league_start_time
         await interaction.response.defer()
