@@ -5,7 +5,7 @@ Code for league draft structure
 import discord
 import asyncio
 import pytz
-from discord.ui import Select, View, Modal, InputText
+from discord.ui import Select, View, Modal, TextInput
 from datetime import datetime, timedelta
 from session import AsyncSessionLocal, Team, DraftSession, Match, Challenge, TeamRegistration, SwissChallenge
 from sqlalchemy import select, update, func
@@ -302,7 +302,7 @@ class RegisterPlayerModal(Modal):
         self.command_type = command_type
         super().__init__(title="Register Player with PlayerID", *args, **kwargs)
         # Update the placeholder to reflect the desired format
-        self.add_item(InputText(label="Integer", placeholder="UserID", custom_id="register_player"))
+        self.add_item(TextInput(label="Integer", placeholder="UserID", custom_id="register_player"))
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         user_id = self.children[0].value 
@@ -402,7 +402,7 @@ class AdjustTimeModal(Modal):
         super().__init__(title="Change the start time of your match", *args, **kwargs)
         # Update the placeholder to reflect the desired format
         
-        self.add_item(InputText(label="MM/DD/YYYY HH:MM. Use Local Time & 24HR Clock", placeholder="MM/DD/YYYY HH:MM", custom_id="start_time"))
+        self.add_item(TextInput(label="MM/DD/YYYY HH:MM. Use Local Time & 24HR Clock", placeholder="MM/DD/YYYY HH:MM", custom_id="start_time"))
                     
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -454,13 +454,13 @@ class ChallengeTimeModal(Modal):
         self.command_type = command_type
         self.match_id = match_id
 
-        self.add_item(InputText(
+        self.add_item(TextInput(
             label="MM/DD/YYYY HH:MM in Local Time/24HR format",
             placeholder="Earliest Start Time" if self.command_type != "swiss" else "Start Time",
             custom_id="start_time"
         ))
         if self.command_type != "swiss":
-            self.add_item(InputText(
+            self.add_item(TextInput(
                 label="Start Time Range (Hours OR Minutes)",
                 placeholder="Enter EITHER hours (e.g., 0, 1, 2) or minutes (e.g., 30, 45, 90)",
                 custom_id="time_range"
