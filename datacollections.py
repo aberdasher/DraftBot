@@ -14,12 +14,13 @@ from session import AsyncSessionLocal, DraftSession
 load_dotenv()
 
 class DraftLogManager:
-    def __init__(self, session_id, draft_link, draft_id, session_type, cube):
+    def __init__(self, session_id, draft_link, draft_id, session_type, cube, use_local_storage=False):
         self.session_id = session_id
         self.draft_link = draft_link
         self.draft_id = draft_id
         self.session_type = session_type
         self.cube = cube
+        self.use_local_storage = use_local_storage
         self.first_delay = False
         self.fetch_attempts = 0
         self.connection_attempts = 0
@@ -118,10 +119,14 @@ class DraftLogManager:
     async def save_draft_log_data(self, draft_data):    
         async with AsyncSessionLocal() as db_session:
             async with db_session.begin():
-                upload_successful = await self.save_to_digitalocean_spaces(draft_data)
+                if self.use_local_storage:
+                    save_successful = await self.save_locally(draft_data)
+                else:
+                    save_successful = await self.save_to_digitalocean_spaces(draft_data)
+                
                 stmt = select(DraftSession).filter(DraftSession.session_id == self.session_id)
                 draft_session = await db_session.scalar(stmt)
-                if upload_successful and draft_session:
+                if save_successful and draft_session:
                     draft_session.data_received = True
                 elif draft_session:
                     draft_session.draft_data = draft_data
@@ -129,6 +134,33 @@ class DraftLogManager:
                 else:
                     print(f"Draft session {self.session_id} not found in the database")
             await db_session.commit()
+
+    async def save_locally(self, draft_data):
+        try:
+            LOCAL_STORAGE_DIR = os.getenv("LOCAL_STORAGE_DIR", "draft_logs")
+            
+            # Create directory if it doesn't exist
+            os.makedirs(LOCAL_STORAGE_DIR, exist_ok=True)
+            
+            start_time = draft_data.get("time")
+            draft_id = draft_data.get("sessionID")
+            
+            # Create folder structure similar to DO Spaces
+            folder = "swiss" if self.session_type == "swiss" else "team"
+            folder_path = os.path.join(LOCAL_STORAGE_DIR, folder)
+            os.makedirs(folder_path, exist_ok=True)
+            
+            file_name = f'{self.cube}-{start_time}-{draft_id}.json'
+            file_path = os.path.join(folder_path, file_name)
+            
+            with open(file_path, 'w') as f:
+                json.dump(draft_data, f)
+                
+            print(f"Draft log data saved locally: {file_path}")
+            return True
+        except Exception as e:
+            print(f"Error saving file locally: {e}")
+            return False
 
     async def save_to_digitalocean_spaces(self, draft_data):
         DO_SPACES_REGION = os.getenv("DO_SPACES_REGION")
